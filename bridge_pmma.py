@@ -21,20 +21,29 @@ def border_interpolate(u):
 
 quarter_bridge_cell = gdspy.Cell('QUARTER_BRIDGE')
 
-quarter_bridge = gdspy.RobustPath((0, bridge_straight_dim[1] / 2 + bridge_border / 2), 1, 0, ends='round')
+quarter_bridge = gdspy.RobustPath((0, bridge_straight_dim[1] / 2 + bridge_border / 2), bridge_border, ends='round')
 quarter_bridge.segment((bridge_straight_dim[0] / 2, bridge_straight_dim[1] / 2 + bridge_border / 2), relative=False)
 quarter_bridge.bezier(
     [(bridge_taper_dim[0] + bridge_straight_dim[0] / 2, bridge_straight_dim[1] / 2 + bridge_border / 2),
      (bridge_taper_dim[0] + bridge_straight_dim[0] / 2, bridge_taper_dim[1])],
     width=border_interpolate, relative=False)
-quarter_bridge.segment((bridge_taper_dim[0] + bridge_straight_dim[0] / 2, lead_dim[1] / 2 - lead_curve_radius),
-                       relative=False)
+qb_lead_turn_start = (bridge_taper_dim[0] + bridge_straight_dim[0] / 2, lead_dim[1] / 2 - lead_curve_radius)
+quarter_bridge.segment(qb_lead_turn_start, relative=False)
 quarter_bridge.turn(lead_curve_radius, -math.pi / 2)
 quarter_bridge.segment((lead_dim[0], lead_dim[1] / 2))
-quarter_bridge.turn(film_dim[1] + film_height_buffer - lead_dim[1], math.pi / 2)
+quarter_bridge.turn(math.sqrt(2) * (film_dim[1] + film_height_buffer - lead_dim[1]), math.pi / 4)
 quarter_bridge_cell.add(quarter_bridge)
 
-qb_right = quarter_bridge.to_polygonset()
+tuning_fork_half = gdspy.RobustPath(qb_lead_turn_start, lead_border)
+tuning_fork_half.segment((qb_lead_turn_start[0], qb_lead_turn_start[1] + lead_curve_radius))
+tuning_fork_half.bezier([(qb_lead_turn_start[0], qb_lead_turn_start[1] + 2 * lead_curve_radius),
+                         (0, qb_lead_turn_start[1] + 2 * lead_curve_radius),
+                         (0, qb_lead_turn_start[1] + 3 * lead_curve_radius)], relative=False)
+tuning_fork_half.segment((0, film_dim[1] + film_height_buffer))
+
+quarter_bridge_cell.add(tuning_fork_half)
+
+qb_right = gdspy.boolean(quarter_bridge.to_polygonset(), tuning_fork_half.to_polygonset(), 'or')
 qb_left = gdspy.copy(qb_right)
 qb_left.mirror((0, 1))
 
